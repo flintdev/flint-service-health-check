@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import os
+import socket
 
 SERVICES = ["python-executor", "admin-service", "kind", "ui", "workflow-engine"]
 
@@ -31,6 +32,19 @@ def init_status():
             json.dump(init_data, outfile)
 
 
+def check_ui():
+    if check_ui_port(8000):
+        status = "available"
+    else:
+        status = "unavailable"
+    return status
+
+
+def check_ui_port(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('ui', port)) == 0
+
+
 def write_status(service, status):
     with open('.runtime/status.json', 'r') as json_file:
         data = json.load(json_file)
@@ -43,8 +57,14 @@ def health_check():
     for service in SERVICES:
         try:
             print(service)
-            r = requests.get("http://{}:8080/health".format(service), timeout=1)
-            status = r.json()["status"]
+            if service == "ui":
+                status = check_ui()
+            else:
+                r = requests.get("http://{}:8080/health".format(service), timeout=1)
+                try:
+                    status = r.json()["status"]
+                except Exception as e:
+                    status = r.json()["Status"]
         except Exception as e:
             status = "unavailable"
         write_status(service, status)
